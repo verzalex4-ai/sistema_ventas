@@ -242,7 +242,7 @@ class MainWindow:
         ClosingView(self.content_frame, self.usuario_id)
 
     def _abrir_gestion_deudores_interno(self):
-        DebtorManagementView(self.content_frame)
+        DebtorManagementView(self.content_frame, self.usuario_id)
 
     def _abrir_gestion_productos_interno(self):
         self.limpiar_content_frame()  # ✅ MÉTODO CORRECTO
@@ -258,7 +258,7 @@ class MainWindow:
         SupplierManagementView(self.content_frame, self, self.usuario_id)
         
     def _abrir_registro_compra_interno(self):
-        PurchaseEntryView(self.content_frame)
+        PurchaseEntryView(self.content_frame, self.usuario_id)
 
     def _abrir_reportes_interno(self):
         ReportsView(self.content_frame)

@@ -1,4 +1,4 @@
-# supplier_management_view.py
+# supplier_management_view.py - CORREGIDO FASE 1
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from tkinter import messagebox
@@ -7,9 +7,9 @@ from database import (
     obtener_proveedor_por_id,
     agregar_proveedor,
     actualizar_proveedor,
-    eliminar_proveedor,
+    desactivar_proveedor,  # ✅ CAMBIADO: antes era eliminar_proveedor
 )
-from base_dialog import BaseDialog  # <-- IMPORTACIÓN AÑADIDA
+from base_dialog import BaseDialog
 
 
 class SupplierManagementView:
@@ -41,7 +41,7 @@ class SupplierManagementView:
         ).pack(side=LEFT, padx=10)
         ttk.Button(
             control_frame,
-            text="Eliminar Seleccionado",
+            text="Desactivar Seleccionado",  # ✅ CAMBIADO: texto más claro
             command=self.eliminar_seleccionado,
             bootstyle="danger",
         ).pack(side=LEFT)
@@ -72,21 +72,17 @@ class SupplierManagementView:
             self.tree.insert("", END, values=supplier)
 
     def abrir_formulario(self, proveedor=None):
-        SupplierForm(self.parent_frame, proveedor, self.cargar_proveedores)
+        SupplierForm(self.parent_frame, proveedor, self.cargar_proveedores, self.usuario_id)
 
     def editar_seleccionado(self):
-        # 1. Obtener la referencia de la ventana principal para la Modalidad.
-        # Usamos self.tree ya que es el widget de la tabla visible.
         root_window = self.tree.winfo_toplevel()
-
         seleccion = self.tree.focus()
 
         if not seleccion:
-            # 2. Aplicamos la Modalidad al mensaje de "Sin Selección"
             messagebox.showwarning(
                 "Sin Selección",
                 "Por favor, selecciona un proveedor para editar.",
-                parent=root_window,  # <-- ¡Modalidad aplicada!
+                parent=root_window,
             )
             return
 
@@ -96,11 +92,10 @@ class SupplierManagementView:
         if proveedor_completo:
             self.abrir_formulario(proveedor_completo)
         else:
-            # 3. Aplicamos la Modalidad al mensaje de "Error"
             messagebox.showerror(
                 "Error",
                 "No se pudieron obtener los datos del proveedor.",
-                parent=root_window,  # <-- ¡Modalidad aplicada!
+                parent=root_window,
             )
 
     def eliminar_seleccionado(self):
@@ -110,7 +105,7 @@ class SupplierManagementView:
         if not seleccion:
             messagebox.showwarning(
                 "Sin Selección",
-                "Por favor, selecciona un proveedor para eliminar.",
+                "Por favor, selecciona un proveedor para desactivar.",
                 parent=root_window,
             )
             return
@@ -118,38 +113,39 @@ class SupplierManagementView:
         id_proveedor = self.tree.item(seleccion, "values")[0]
         nombre = self.tree.item(seleccion, "values")[1]
 
-        # Mostrar el diálogo de confirmación antes de intentar cualquier eliminación
+        # ✅ CAMBIADO: Mensaje más claro sobre eliminación lógica
         if messagebox.askyesno(
-            "Confirmar Eliminación",
-            f"¿Estás seguro de que quieres eliminar al proveedor '{nombre}'? Esta acción es PERMANENTE si se procede.",
+            "Confirmar Desactivación",
+            f"¿Estás seguro de que quieres desactivar al proveedor '{nombre}'?\n\n"
+            "El proveedor no será eliminado permanentemente, pero no aparecerá en las listas activas.",
             parent=root_window,
         ):
-            # La función de la BD (modificada) devuelve True o False
-            if eliminar_proveedor(id_proveedor):
-                # ÉXITO: El proveedor no tenía productos y se eliminó.
+            # ✅ CAMBIADO: Usar desactivar_proveedor
+            resultado = desactivar_proveedor(self.usuario_id, id_proveedor)
+            
+            if resultado is True:
                 messagebox.showinfo(
                     "Éxito",
-                    f"El proveedor '{nombre}' ha sido eliminado.",
+                    f"El proveedor '{nombre}' ha sido desactivado.",
                     parent=root_window,
                 )
                 self.cargar_proveedores()
             else:
-                # ERROR: Falló porque tenía productos.
                 messagebox.showerror(
-                    "Error de Eliminación",
-                    f"No se pudo eliminar al proveedor '{nombre}'. Verifique que no tenga productos asociados.",
+                    "Error",
+                    str(resultado),
                     parent=root_window,
                 )
 
 
-# --- CLASE MODIFICADA: Ahora hereda de BaseDialog ---
 class SupplierForm(BaseDialog):
-    def __init__(self, parent, proveedor, callback):
+    def __init__(self, parent, proveedor, callback, usuario_id):
         title = "Editar Proveedor" if proveedor else "Formulario de Proveedor"
         super().__init__(parent, title=title)
 
         self.proveedor = proveedor
         self.callback = callback
+        self.usuario_id = usuario_id
 
         form_frame = ttk.Frame(self, padding=20)
         form_frame.pack(expand=True, fill=BOTH)
@@ -162,7 +158,6 @@ class SupplierForm(BaseDialog):
             self.entries[campo].grid(row=i, column=1, sticky="ew", pady=5)
 
         if self.proveedor:
-            # Estructura: (id, nombre, telefono, email, direccion, activo)
             self.entries["Nombre:"].insert(0, self.proveedor[1])
             self.entries["Teléfono:"].insert(0, self.proveedor[2])
             self.entries["Email:"].insert(0, self.proveedor[3])
@@ -171,7 +166,6 @@ class SupplierForm(BaseDialog):
         ttk.Button(
             form_frame, text="Guardar", command=self.guardar, bootstyle="success"
         ).grid(row=len(campos), column=0, columnspan=2, pady=15)
-        # El centrado, transient y grab_set() ahora son automáticos
 
     def guardar(self):
         nombre = self.entries["Nombre:"].get()
@@ -186,9 +180,9 @@ class SupplierForm(BaseDialog):
         direccion = self.entries["Dirección:"].get()
 
         if self.proveedor:
-            resultado = actualizar_proveedor(self.proveedor[0], nombre, telefono, email, direccion)
+            resultado = actualizar_proveedor(self.usuario_id, self.proveedor[0], nombre, telefono, email, direccion)
         else:
-            resultado = agregar_proveedor(nombre, telefono, email, direccion)
+            resultado = agregar_proveedor(self.usuario_id, nombre, telefono, email, direccion)
 
         if resultado is True:
             messagebox.showinfo("Éxito", "Proveedor guardado.", parent=self)

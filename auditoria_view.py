@@ -1,4 +1,4 @@
-# auditoria_view.py
+# auditoria_view.py - CORREGIDO FASE 1
 
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
@@ -14,10 +14,8 @@ class AuditoriaView:
         self.frame = ttk.Frame(master, padding=15)
         self.frame.pack(fill=BOTH, expand=True)
 
-        # Datos completos (cache para filtrado)
         self.datos_completos = []
         
-        # Categorías de acciones predefinidas
         self.categorias_acciones = {
             "TODAS": "Todas las Acciones",
             "PROD": "Productos",
@@ -36,9 +34,7 @@ class AuditoriaView:
     def crear_interfaz(self):
         """Crea toda la interfaz de usuario."""
         
-        # ============================================
         # ENCABEZADO
-        # ============================================
         header_frame = ttk.Frame(self.frame)
         header_frame.pack(fill=X, pady=(0, 15))
         
@@ -63,24 +59,20 @@ class AuditoriaView:
             bootstyle="info-outline"
         ).pack(side=RIGHT)
 
-        # ============================================
         # PANEL DE FILTROS
-        # ============================================
         filtros_frame = ttk.LabelFrame(self.frame, text="🔍 Filtros de Búsqueda", padding=15)
         filtros_frame.pack(fill=X, pady=(0, 10))
 
-        # --- FILA 1: Búsqueda y Categoría ---
+        # FILA 1: Búsqueda y Categoría
         row1 = ttk.Frame(filtros_frame)
         row1.pack(fill=X, pady=(0, 10))
 
-        # Búsqueda general
         ttk.Label(row1, text="Buscar:", font=("Helvetica", 10, "bold")).pack(side=LEFT, padx=(0, 5))
         self.search_var = ttk.StringVar()
         search_entry = ttk.Entry(row1, textvariable=self.search_var, width=40)
         search_entry.pack(side=LEFT, padx=(0, 20))
         search_entry.bind("<KeyRelease>", lambda e: self.aplicar_filtros())
         
-        # Categoría de acción
         ttk.Label(row1, text="Categoría:", font=("Helvetica", 10, "bold")).pack(side=LEFT, padx=(0, 5))
         self.categoria_var = ttk.StringVar(value="TODAS")
         categoria_combo = ttk.Combobox(
@@ -93,11 +85,10 @@ class AuditoriaView:
         categoria_combo.pack(side=LEFT)
         categoria_combo.bind("<<ComboboxSelected>>", lambda e: self.aplicar_filtros())
 
-        # --- FILA 2: Usuario y Rango de Fechas ---
+        # FILA 2: Usuario y Rol
         row2 = ttk.Frame(filtros_frame)
         row2.pack(fill=X, pady=(0, 10))
 
-        # Filtro por Usuario
         ttk.Label(row2, text="Usuario:", font=("Helvetica", 10, "bold")).pack(side=LEFT, padx=(0, 5))
         self.usuario_var = ttk.StringVar(value="Todos")
         self.usuario_combo = ttk.Combobox(
@@ -110,7 +101,6 @@ class AuditoriaView:
         self.usuario_combo.pack(side=LEFT, padx=(0, 20))
         self.usuario_combo.bind("<<ComboboxSelected>>", lambda e: self.aplicar_filtros())
 
-        # Filtro por Rol
         ttk.Label(row2, text="Rol:", font=("Helvetica", 10, "bold")).pack(side=LEFT, padx=(0, 5))
         self.rol_var = ttk.StringVar(value="Todos")
         rol_combo = ttk.Combobox(
@@ -123,13 +113,12 @@ class AuditoriaView:
         rol_combo.pack(side=LEFT, padx=(0, 20))
         rol_combo.bind("<<ComboboxSelected>>", lambda e: self.aplicar_filtros())
 
-        # --- FILA 3: Rango de Fechas ---
+        # FILA 3: Rango de Fechas
         row3 = ttk.Frame(filtros_frame)
         row3.pack(fill=X)
 
         ttk.Label(row3, text="Rango de Fechas:", font=("Helvetica", 10, "bold")).pack(side=LEFT, padx=(0, 10))
 
-        # Fecha desde con calendario
         ttk.Label(row3, text="Desde:").pack(side=LEFT, padx=(0, 5))
         self.fecha_desde_entry = ttk.DateEntry(
             row3,
@@ -140,7 +129,6 @@ class AuditoriaView:
         )
         self.fecha_desde_entry.pack(side=LEFT, padx=(0, 5))
         
-        # Botón para limpiar fecha desde
         ttk.Button(
             row3,
             text="✖",
@@ -149,7 +137,6 @@ class AuditoriaView:
             width=3
         ).pack(side=LEFT, padx=(0, 15))
         
-        # Fecha hasta con calendario
         ttk.Label(row3, text="Hasta:").pack(side=LEFT, padx=(0, 5))
         self.fecha_hasta_entry = ttk.DateEntry(
             row3,
@@ -160,7 +147,6 @@ class AuditoriaView:
         )
         self.fecha_hasta_entry.pack(side=LEFT, padx=(0, 5))
         
-        # Botón para limpiar fecha hasta
         ttk.Button(
             row3,
             text="✖",
@@ -171,15 +157,12 @@ class AuditoriaView:
 
         ttk.Label(row3, text="(Formato: YYYY-MM-DD)", font=("Helvetica", 8)).pack(side=LEFT, padx=(0, 10))
 
-        # Botones de filtros rápidos
         ttk.Button(row3, text="Hoy", command=lambda: self.filtro_rapido("hoy"), bootstyle="info", width=8).pack(side=LEFT, padx=2)
         ttk.Button(row3, text="7 días", command=lambda: self.filtro_rapido("7dias"), bootstyle="info", width=8).pack(side=LEFT, padx=2)
         ttk.Button(row3, text="30 días", command=lambda: self.filtro_rapido("30dias"), bootstyle="info", width=8).pack(side=LEFT, padx=2)
         ttk.Button(row3, text="Limpiar", command=self.limpiar_filtros, bootstyle="warning", width=8).pack(side=LEFT, padx=2)
         
-        # ============================================
         # ESTADÍSTICAS
-        # ============================================
         stats_frame = ttk.Frame(self.frame)
         stats_frame.pack(fill=X, pady=(0, 10))
 
@@ -191,17 +174,13 @@ class AuditoriaView:
         )
         self.stats_label.pack(side=LEFT)
 
-        # ============================================
         # TABLA DE REGISTROS
-        # ============================================
         table_frame = ttk.Frame(self.frame)
         table_frame.pack(fill=BOTH, expand=True)
 
-        # Scrollbars
         scrollbar_y = ttk.Scrollbar(table_frame, orient=VERTICAL)
         scrollbar_x = ttk.Scrollbar(table_frame, orient=HORIZONTAL)
 
-        # Treeview
         self.columns = ("fecha_hora", "usuario", "rol", "accion", "descripcion")
         self.tree = ttk.Treeview(
             table_frame,
@@ -215,7 +194,6 @@ class AuditoriaView:
         scrollbar_y.config(command=self.tree.yview)
         scrollbar_x.config(command=self.tree.xview)
 
-        # Configurar columnas
         self.tree.heading("fecha_hora", text="📅 Fecha y Hora", anchor=W)
         self.tree.heading("usuario", text="👤 Usuario", anchor=W)
         self.tree.heading("rol", text="🎭 Rol", anchor=CENTER)
@@ -228,23 +206,17 @@ class AuditoriaView:
         self.tree.column("accion", width=150, anchor=W)
         self.tree.column("descripcion", width=500, anchor=W)
 
-        # Colores alternados para mejor lectura
         self.tree.tag_configure("oddrow", background="#161d80")
         self.tree.tag_configure("evenrow", background="#161d80")
 
-        # Colores por tipo de acción
         self.tree.tag_configure("CREADO", foreground="#28a745")
         self.tree.tag_configure("ACTUALIZADO", foreground="#007bff")
         self.tree.tag_configure("ELIMINADO", foreground="#dc3545")
         self.tree.tag_configure("DESACTIVADO", foreground="#ffc107")
 
-        # ✅ Quitar color blanco al seleccionar
         self.tree.tag_configure('selected', foreground='black')
         self.tree.tag_bind('<<TreeviewSelect>>', lambda e: None)
         
-        # Layout
-        
-        # Layout
         scrollbar_y.pack(side=RIGHT, fill=Y)
         scrollbar_x.pack(side=BOTTOM, fill=X)
         self.tree.pack(side=LEFT, fill=BOTH, expand=True)
@@ -252,7 +224,6 @@ class AuditoriaView:
     def cargar_datos_auditoria(self):
         """Carga todos los registros de auditoría desde la base de datos."""
         try:
-            # Obtener registros (limitado a 1000 para rendimiento)
             registros = obtener_registro_auditoria(limite=1000)
             
             if not registros:
@@ -261,39 +232,25 @@ class AuditoriaView:
                 messagebox.showinfo("Sin Registros", "No hay registros de auditoría disponibles.", parent=self.frame.winfo_toplevel())
                 return
 
-            # Procesar datos y extraer información única
             self.datos_completos = []
             usuarios_unicos = set()
             roles_unicos = set()
 
+            # ✅ CORRECCIÓN CRÍTICA: Ahora desempaquetamos 5 valores (con rol)
             for registro in registros:
-                fecha_hora, usuario, accion, descripcion = registro
-                
-                # Inferir el rol del usuario desde el nombre o la acción
-                # (Esto es una aproximación, lo ideal es tener el rol en la tabla)
-                if "admin" in usuario.lower():
-                    rol = "admin"
-                elif "cajero" in usuario.lower():
-                    rol = "usuario"
-                elif "auditor" in usuario.lower():
-                    rol = "auditor"
-                else:
-                    rol = "usuario"  # Por defecto
+                fecha_hora, usuario, rol, accion, descripcion = registro
                 
                 usuarios_unicos.add(usuario)
                 roles_unicos.add(rol)
                 
                 self.datos_completos.append((fecha_hora, usuario, rol, accion, descripcion))
 
-            # Actualizar combobox de usuarios
             usuarios_lista = ["Todos"] + sorted(list(usuarios_unicos))
             self.usuario_combo.config(values=usuarios_lista)
 
-            # Limpiar filtros de fecha al cargar
             self.limpiar_fecha_desde()
             self.limpiar_fecha_hasta()
             
-            # Aplicar filtros (inicialmente muestra todo)
             self.aplicar_filtros()
 
         except Exception as e:
@@ -305,7 +262,6 @@ class AuditoriaView:
             self.mostrar_en_tabla([])
             return
 
-        # Obtener valores de filtros
         busqueda = self.search_var.get().lower().strip()
         categoria_seleccionada = self.categoria_var.get()
         usuario_seleccionado = self.usuario_var.get()
@@ -313,38 +269,31 @@ class AuditoriaView:
         fecha_desde = self.fecha_desde_entry.entry.get().strip()
         fecha_hasta = self.fecha_hasta_entry.entry.get().strip()
 
-        # Obtener clave de categoría
         categoria_clave = next(
             (k for k, v in self.categorias_acciones.items() if v == categoria_seleccionada),
             "TODAS"
         )
 
-        # Filtrar datos
         datos_filtrados = []
         for fecha_hora, usuario, rol, accion, descripcion in self.datos_completos:
             
-            # Filtro de búsqueda general
             if busqueda:
                 texto_completo = f"{fecha_hora} {usuario} {accion} {descripcion}".lower()
                 if busqueda not in texto_completo:
                     continue
 
-            # Filtro de categoría
             if categoria_clave != "TODAS":
                 if not accion.startswith(categoria_clave):
                     continue
 
-            # Filtro de usuario
             if usuario_seleccionado != "Todos":
                 if usuario != usuario_seleccionado:
                     continue
 
-            # Filtro de rol
             if rol_seleccionado != "Todos":
                 if rol != rol_seleccionado:
                     continue
 
-            # Filtro de fecha desde
             if fecha_desde:
                 try:
                     fecha_registro = datetime.strptime(fecha_hora.split()[0], "%Y-%m-%d")
@@ -352,9 +301,8 @@ class AuditoriaView:
                     if fecha_registro < fecha_filtro_desde:
                         continue
                 except ValueError:
-                    pass  # Ignorar errores de formato
+                    pass
 
-            # Filtro de fecha hasta
             if fecha_hasta:
                 try:
                     fecha_registro = datetime.strptime(fecha_hora.split()[0], "%Y-%m-%d")
@@ -364,21 +312,16 @@ class AuditoriaView:
                 except ValueError:
                     pass
 
-            # Si pasa todos los filtros, añadir
             datos_filtrados.append((fecha_hora, usuario, rol, accion, descripcion))
 
-        # Mostrar datos filtrados
         self.mostrar_en_tabla(datos_filtrados)
 
     def mostrar_en_tabla(self, datos):
         """Muestra los datos en el Treeview."""
-        # Limpiar tabla
         for item in self.tree.get_children():
             self.tree.delete(item)
 
-        # Insertar datos con colores
         for idx, (fecha_hora, usuario, rol, accion, descripcion) in enumerate(datos):
-            # Determinar etiquetas de color
             tags = ["oddrow" if idx % 2 == 0 else "evenrow"]
             
             if "CREADO" in accion or "AGREGADO" in accion:
@@ -392,7 +335,6 @@ class AuditoriaView:
 
             self.tree.insert("", END, values=(fecha_hora, usuario, rol, accion, descripcion), tags=tags)
 
-        # Actualizar estadísticas
         total = len(self.datos_completos)
         mostrados = len(datos)
         self.stats_label.config(text=f"📊 Total de registros: {total} | Mostrando: {mostrados}")
@@ -443,7 +385,6 @@ class AuditoriaView:
 
     def exportar_csv(self):
         """Exporta los registros visibles a un archivo CSV."""
-        # Obtener datos visibles
         datos_visibles = []
         for item in self.tree.get_children():
             valores = self.tree.item(item, "values")
@@ -453,7 +394,6 @@ class AuditoriaView:
             messagebox.showwarning("Sin Datos", "No hay registros para exportar.", parent=self.frame.winfo_toplevel())
             return
 
-        # Diálogo para guardar archivo
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         nombre_archivo = f"auditoria_{timestamp}.csv"
         
@@ -467,13 +407,10 @@ class AuditoriaView:
         if not ruta_archivo:
             return
 
-        # Escribir CSV
         try:
             with open(ruta_archivo, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
-                # Encabezados
                 writer.writerow(["Fecha y Hora", "Usuario", "Rol", "Acción", "Descripción"])
-                # Datos
                 writer.writerows(datos_visibles)
             
             messagebox.showinfo("Éxito", f"Registros exportados exitosamente a:\n{ruta_archivo}", parent=self.frame.winfo_toplevel())

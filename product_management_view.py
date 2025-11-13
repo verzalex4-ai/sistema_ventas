@@ -167,7 +167,7 @@ class ProductManagementView:
         self.parent_frame.wait_window(form)
 
     def abrir_gestion_categorias(self):
-        dialog = CategoryManagerDialog(self.parent_frame, self.cargar_productos)
+        dialog = CategoryManagerDialog(self.parent_frame, self.cargar_productos, self.usuario_id)
         self.parent_frame.wait_window(dialog)
 
     def editar_producto_seleccionado(self):
@@ -413,9 +413,10 @@ class ProductForm(BaseDialog):
 # GESTIÓN DE CATEGORÍAS
 # --------------------------------------------
 class CategoryManagerDialog(BaseDialog):
-    def __init__(self, parent, callback_refrescar):
+    def __init__(self, parent, callback_refrescar, usuario_id):
         super().__init__(parent, title="Gestionar Categorías")
         self.callback = callback_refrescar
+        self.usuario_id = usuario_id
 
         main_frame = ttk.Frame(self, padding=10)
         main_frame.pack(fill=BOTH, expand=True)
@@ -480,11 +481,11 @@ class CategoryManagerDialog(BaseDialog):
                 )
                 continue
             nombre_limpio = nombre.strip()
-            resultado = agregar_categoria(nombre_limpio)
+            resultado = agregar_categoria(self.usuario_id, nombre_limpio)
             if resultado is True:
                 messagebox.showinfo(
                     "Éxito", f"Categoría '{nombre_limpio}' añadida.", parent=self
-                )
+                )   
                 self.cargar_categorias()
                 break
             else:
@@ -508,7 +509,7 @@ class CategoryManagerDialog(BaseDialog):
             f"¿Eliminar la categoría '{cat_nombre}'?\nLos productos en esta categoría quedarán como 'Sin Categoría'.",
             parent=self,
         ):
-            resultado = eliminar_categoria(cat_id)
+            resultado = eliminar_categoria(self.usuario_id, cat_id)
             if resultado is True:
                 self.cargar_categorias()
             else:

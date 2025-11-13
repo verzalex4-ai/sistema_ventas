@@ -1,4 +1,4 @@
-# debtor_management_view.py
+# debtor_management_view.py - CORREGIDO FASE 1
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from tkinter import messagebox, simpledialog
@@ -19,8 +19,9 @@ from base_dialog import BaseDialog
 
 
 class DebtorManagementView:
-    def __init__(self, parent_frame):
+    def __init__(self, parent_frame, usuario_id):  # ✅ AGREGADO usuario_id
         self.parent_frame = parent_frame
+        self.usuario_id = usuario_id  # ✅ AGREGADO
 
         ttk.Label(
             self.parent_frame,
@@ -92,7 +93,7 @@ class DebtorManagementView:
             )
 
     def abrir_formulario(self, deudor_id=None):
-        form = DebtorForm(self.parent_frame, deudor_id, self.cargar_deudores)
+        form = DebtorForm(self.parent_frame, deudor_id, self.cargar_deudores, self.usuario_id)  # ✅ AGREGADO usuario_id
         self.parent_frame.wait_window(form)
 
     def editar_seleccionado(self):
@@ -109,38 +110,31 @@ class DebtorManagementView:
         self.abrir_formulario(deudor_id=id_deudor)
 
     def eliminar_seleccionado(self):
-        # 1. Obtener la referencia de la ventana principal para la Modalidad
-        # Usamos el widget de la tabla (self.tree) para subir al nivel superior
         root_window = self.tree.winfo_toplevel()
-
         seleccion = self.tree.focus()
 
         if not seleccion:
-            # Aplicamos la Modalidad con parent=root_window
             messagebox.showwarning(
                 "Sin Selección",
                 "Por favor, selecciona un deudor para eliminar.",
-                parent=root_window,  # <-- ¡Aquí está la clave!
+                parent=root_window,
             )
             return
 
         id_deudor = self.tree.item(seleccion, "values")[0]
         nombre = self.tree.item(seleccion, "values")[1]
 
-        # Aplicamos la Modalidad al cuadro de diálogo de confirmación 'askyesno'
         if messagebox.askyesno(
             "Confirmar",
             f"¿Eliminar a '{nombre}'? Solo se permitirá si su saldo es $0.00.",
-            parent=root_window,  # <-- ¡Aquí también es importante!
+            parent=root_window,
         ):
-            resultado = eliminar_deudor(id_deudor)
+            resultado = eliminar_deudor(self.usuario_id, id_deudor)  # ✅ AGREGADO usuario_id
 
             if resultado is True:
-                # Aplicamos la Modalidad al mensaje de éxito
                 messagebox.showinfo("Éxito", "Deudor eliminado.", parent=root_window)
                 self.cargar_deudores()
             else:
-                # Aplicamos la Modalidad al mensaje de error
                 messagebox.showerror("Error", str(resultado), parent=root_window)
 
     def ver_estado_de_cuenta(self):
@@ -152,16 +146,17 @@ class DebtorManagementView:
             )
             return
         id_deudor = self.tree.item(seleccion, "values")[0]
-        AccountStatusView(self.parent_frame, id_deudor, self.cargar_deudores)
+        AccountStatusView(self.parent_frame, id_deudor, self.cargar_deudores, self.usuario_id)  # ✅ AGREGADO usuario_id
 
 
 class DebtorForm(BaseDialog):
-    def __init__(self, parent, deudor_id, callback):
+    def __init__(self, parent, deudor_id, callback, usuario_id):  # ✅ AGREGADO usuario_id
         title = "Editar Deudor" if deudor_id else "Formulario de Deudor"
         super().__init__(parent, title=title)
 
         self.deudor_id = deudor_id
         self.callback = callback
+        self.usuario_id = usuario_id  # ✅ AGREGADO
         self.deudor_data = None
 
         if self.deudor_id:
@@ -202,9 +197,9 @@ class DebtorForm(BaseDialog):
         }
 
         if self.deudor_id:
-            resultado = actualizar_deudor(self.deudor_id, **datos)
+            resultado = actualizar_deudor(self.usuario_id, self.deudor_id, **datos)  # ✅ AGREGADO usuario_id
         else:
-            resultado = agregar_deudor(**datos)
+            resultado = agregar_deudor(self.usuario_id, **datos)  # ✅ AGREGADO usuario_id
 
         if resultado is True:
             try:
@@ -218,10 +213,11 @@ class DebtorForm(BaseDialog):
 
 
 class AccountStatusView(ttk.Toplevel):
-    def __init__(self, parent, deudor_id, callback_refrescar_lista):
+    def __init__(self, parent, deudor_id, callback_refrescar_lista, usuario_id):  # ✅ AGREGADO usuario_id
         super().__init__(title="Estado de Cuenta")
         self.deudor_id = deudor_id
         self.callback = callback_refrescar_lista
+        self.usuario_id = usuario_id  # ✅ AGREGADO
 
         self.deudor_data = obtener_deudor_por_id(self.deudor_id)
         if not self.deudor_data:
@@ -359,7 +355,6 @@ class AccountStatusView(ttk.Toplevel):
     def registrar_pago(self):
         seleccion = self.deudas_tree.focus()
         if not seleccion:
-            # NOTA: Usamos self.deudas_tree.winfo_toplevel() si self no es la ventana raíz
             root_window = self.deudas_tree.winfo_toplevel()
             messagebox.showwarning(
                 "Sin Selección",
@@ -375,26 +370,16 @@ class AccountStatusView(ttk.Toplevel):
         monto = simpledialog.askfloat(
             "Registrar Pago",
             f"El saldo de esta deuda es ${saldo_pendiente:.2f}.\n\nIngrese el monto del pago:",
-            # Aquí asumimos que 'self' es una referencia al widget padre o la vista
             parent=self.deudas_tree.winfo_toplevel(),
             minvalue=0.01,
             maxvalue=saldo_pendiente,
         )
 
-        # ------------------------------------------------------------------
-        # CORRECCIÓN CLAVE: Verifica si el monto es None (vacío o cancelado)
-        # ------------------------------------------------------------------
         if monto is None:
-            # Si el usuario presiona Cancelar o presiona OK sin ingresar un número,
-            # 'monto' será None. Simplemente salimos de la función sin error.
-            # *Nota: simpledialog ya maneja los errores de formato y min/max value.*
             return
 
-        # Si llegamos aquí, 'monto' es un float válido (0.01 <= monto <= saldo_pendiente)
-
-        resultado = registrar_pago_deudor(self.deudor_id, venta_id, monto)
+        resultado = registrar_pago_deudor(self.usuario_id, self.deudor_id, venta_id, monto)  # ✅ AGREGADO usuario_id
         if resultado is True:
-            # Usamos winfo_toplevel() para asegurar la modalidad si 'self' no es la raíz
             messagebox.showinfo(
                 "Éxito", "Pago registrado.", parent=self.deudas_tree.winfo_toplevel()
             )

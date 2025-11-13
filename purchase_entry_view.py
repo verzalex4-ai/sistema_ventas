@@ -104,8 +104,9 @@ class InputAmountDialog(ttk.Toplevel):
 # 2. VISTA PRINCIPAL
 # =============================================================================
 class PurchaseEntryView:
-    def __init__(self, parent_frame):
+    def __init__(self, parent_frame, usuario_id):
         self.parent_frame = parent_frame
+        self.usuario_id = usuario_id  # ✅ AGREGAR ESTA LÍNEA
         self.carrito_compra = {}
 
         top_frame = ttk.Frame(self.parent_frame)
@@ -355,11 +356,11 @@ class PurchaseEntryView:
             f"Se registrará una compra al proveedor '{proveedor_nombre}' por un total de ${total_costo:.2f}. El stock de los productos se actualizará.\n\n¿Deseas continuar?",
             parent=root_window,
         ):
-            if registrar_compra(proveedor_id, total_costo, self.carrito_compra):
+            if registrar_compra(self.usuario_id, proveedor_id, total_costo, self.carrito_compra):
                 messagebox.showinfo(
-                    "Éxito",
-                    "La compra ha sido registrada y el stock actualizado.",
-                    parent=root_window,
+                "Éxito",
+                "La compra ha sido registrada y el stock actualizado.",
+                parent=root_window,
                 )
                 self.carrito_compra.clear()
                 self.actualizar_vista_compra()
