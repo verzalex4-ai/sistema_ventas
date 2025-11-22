@@ -205,6 +205,36 @@ def setup_database():
                 FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
             );
         """)
+        
+                # --- TABLA DEVOLUCIONES ---
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS devoluciones (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                venta_id INTEGER NOT NULL,
+                usuario_id INTEGER NOT NULL,
+                fecha_hora TEXT NOT NULL,
+                total_devolucion REAL NOT NULL CHECK(total_devolucion >= 0),
+                tipo_devolucion TEXT NOT NULL CHECK(tipo_devolucion IN ('COMPLETA', 'PARCIAL')),
+                motivo TEXT,
+                FOREIGN KEY (venta_id) REFERENCES ventas (id),
+                FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
+            );
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS detalles_devolucion (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                devolucion_id INTEGER NOT NULL,
+                producto_id INTEGER NOT NULL,
+                cantidad_devuelta INTEGER NOT NULL CHECK(cantidad_devuelta > 0),
+                precio_unitario REAL NOT NULL CHECK(precio_unitario >= 0),
+                FOREIGN KEY (devolucion_id) REFERENCES devoluciones (id) ON DELETE CASCADE,
+                FOREIGN KEY (producto_id) REFERENCES productos (id)
+            );
+        ''')
+
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_devoluciones_venta ON devoluciones(venta_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_devoluciones_fecha ON devoluciones(fecha_hora);")
 
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_cierres_fecha ON cierres_caja(fecha_hora);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_cierres_usuario ON cierres_caja(usuario_id);")
@@ -1135,4 +1165,336 @@ def obtener_resumen_cierres(cursor, fecha_inicio, fecha_fin):
         "total_sobrantes": resultado[5] or 0.0,
         "total_faltantes": resultado[6] or 0.0,
         "cierres_cuadrados": resultado[7] or 0
+    }
+
+@db_connection
+def buscar_ventas_para_devolucion(cursor, criterio, valor):
+    """
+    Busca ventas que puedan ser devueltas.
+    
+    Args:
+        criterio: 'id', 'fecha', 'deudor'
+        valor: El valor a buscar
+    
+    Returns:
+        Lista de ventas encontradas
+    """
+    if criterio == 'id':
+        query = """
+            SELECT 
+                v.id,
+                v.fecha_hora,
+                u.nombre_usuario,
+                v.total,
+                v.tipo_pago,
+                IFNULL(d.nombre, 'N/A') as deudor
+            FROM ventas v
+            JOIN usuarios u ON v.usuario_id = u.id
+            LEFT JOIN deudores d ON v.deudor_id = d.id
+            WHERE v.id = ?
+        """
+        cursor.execute(query, (valor,))
+    elif criterio == 'fecha':
+        query = """
+            SELECT 
+                v.id,
+                v.fecha_hora,
+                u.nombre_usuario,
+                v.total,
+                v.tipo_pago,
+                IFNULL(d.nombre, 'N/A') as deudor
+            FROM ventas v
+            JOIN usuarios u ON v.usuario_id = u.id
+            LEFT JOIN deudores d ON v.deudor_id = d.id
+            WHERE DATE(v.fecha_hora) = ?
+            ORDER BY v.fecha_hora DESC
+        """
+        cursor.execute(query, (valor,))
+    else:
+        return []
+    
+    return cursor.fetchall()
+
+
+@db_connection
+def obtener_detalle_venta_para_devolucion(cursor, venta_id):
+    """
+    Obtiene el detalle completo de una venta para procesarla.
+    
+    Returns:
+        Tupla con (info_venta, detalles_productos)
+    """
+    # Info general de la venta
+    cursor.execute("""
+        SELECT 
+            v.id,
+            v.fecha_hora,
+            v.usuario_id,
+            u.nombre_usuario,
+            v.total,
+            v.tipo_pago,
+            v.deudor_id,
+            IFNULL(d.nombre, 'N/A') as deudor_nombre,
+            v.saldo_pendiente
+        FROM ventas v
+        JOIN usuarios u ON v.usuario_id = u.id
+        LEFT JOIN deudores d ON v.deudor_id = d.id
+        WHERE v.id = ?
+    """, (venta_id,))
+    
+    info_venta = cursor.fetchone()
+    if not info_venta:
+        return None, None
+    
+    # Detalles de productos
+    cursor.execute("""
+        SELECT 
+            dv.id,
+            dv.producto_id,
+            p.codigo,
+            p.nombre,
+            dv.cantidad,
+            dv.precio_unitario,
+            (dv.cantidad * dv.precio_unitario) as subtotal
+        FROM detalles_venta dv
+        JOIN productos p ON dv.producto_id = p.id
+        WHERE dv.venta_id = ?
+    """, (venta_id,))
+    
+    detalles = cursor.fetchall()
+    
+    return info_venta, detalles
+
+
+@db_connection
+def verificar_devolucion_previa(cursor, venta_id):
+    """
+    Verifica si una venta ya tiene devoluciones registradas.
+    
+    Returns:
+        Tupla (tiene_devolucion, total_devuelto)
+    """
+    cursor.execute("""
+        SELECT 
+            COUNT(*),
+            IFNULL(SUM(total_devolucion), 0)
+        FROM devoluciones
+        WHERE venta_id = ?
+    """, (venta_id,))
+    
+    resultado = cursor.fetchone()
+    tiene_devolucion = resultado[0] > 0
+    total_devuelto = resultado[1]
+    
+    return tiene_devolucion, total_devuelto
+
+
+@db_connection
+def registrar_devolucion(cursor, usuario_id, venta_id, productos_devolver, motivo=""):
+    """
+    Registra una devolución completa o parcial.
+    
+    Args:
+        usuario_id: Usuario que procesa la devolución
+        venta_id: ID de la venta original
+        productos_devolver: Dict {producto_id: cantidad_a_devolver}
+        motivo: Razón de la devolución
+    
+    Returns:
+        ID de la devolución o None si falla
+    """
+    try:
+        # 1. Obtener info de la venta
+        cursor.execute("""
+            SELECT tipo_pago, deudor_id, total
+            FROM ventas
+            WHERE id = ?
+        """, (venta_id,))
+        
+        venta_info = cursor.fetchone()
+        if not venta_info:
+            return None
+        
+        tipo_pago, deudor_id, total_venta = venta_info
+        
+        # 2. Calcular total de la devolución
+        total_devolucion = 0.0
+        detalles_devolucion = []
+        
+        for producto_id, cantidad_devolver in productos_devolver.items():
+            # Obtener precio unitario de la venta original
+            cursor.execute("""
+                SELECT precio_unitario
+                FROM detalles_venta
+                WHERE venta_id = ? AND producto_id = ?
+            """, (venta_id, producto_id))
+            
+            precio_unitario = cursor.fetchone()[0]
+            subtotal = cantidad_devolver * precio_unitario
+            total_devolucion += subtotal
+            
+            detalles_devolucion.append((producto_id, cantidad_devolver, precio_unitario))
+        
+        # 3. Determinar si es devolución completa o parcial
+        es_completa = (total_devolucion >= total_venta)
+        tipo_devolucion = "COMPLETA" if es_completa else "PARCIAL"
+        
+        # 4. Registrar la devolución
+        fecha_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO devoluciones 
+            (venta_id, usuario_id, fecha_hora, total_devolucion, tipo_devolucion, motivo)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (venta_id, usuario_id, fecha_hora, total_devolucion, tipo_devolucion, motivo))
+        
+        devolucion_id = cursor.lastrowid
+        
+        # 5. Registrar detalles de la devolución
+        for producto_id, cantidad, precio_unitario in detalles_devolucion:
+            cursor.execute("""
+                INSERT INTO detalles_devolucion
+                (devolucion_id, producto_id, cantidad_devuelta, precio_unitario)
+                VALUES (?, ?, ?, ?)
+            """, (devolucion_id, producto_id, cantidad, precio_unitario))
+            
+            # 6. Restaurar stock
+            cursor.execute("""
+                UPDATE productos
+                SET stock = stock + ?
+                WHERE id = ?
+            """, (cantidad, producto_id))
+        
+        # 7. Procesar reintegro según tipo de pago
+        if tipo_pago == "Credito" and deudor_id:
+            # Reducir deuda del deudor
+            cursor.execute("""
+                UPDATE deudores
+                SET saldo = saldo - ?
+                WHERE id = ?
+            """, (total_devolucion, deudor_id))
+            
+            # Actualizar saldo pendiente de la venta
+            cursor.execute("""
+                UPDATE ventas
+                SET saldo_pendiente = saldo_pendiente - ?
+                WHERE id = ?
+            """, (total_devolucion, venta_id))
+        
+        # 8. Auditar
+        cursor.execute("SELECT nombre FROM deudores WHERE id = ?", (deudor_id,)) if deudor_id else None
+        nombre_deudor = cursor.fetchone()[0] if deudor_id and cursor.rowcount > 0 else "N/A"
+        
+        registrar_auditoria(
+            cursor,
+            usuario_id,
+            "DEVOLUCION_REGISTRADA",
+            f"Devolución ID {devolucion_id} de venta #{venta_id}. "
+            f"Total: ${total_devolucion:.2f}. Tipo: {tipo_devolucion}. "
+            f"Pago: {tipo_pago}{f' (Deudor: {nombre_deudor})' if deudor_id else ''}."
+        )
+        
+        return devolucion_id
+        
+    except sqlite3.Error as e:
+        print(f"Error al registrar devolución: {e}")
+        return None
+
+
+@db_connection
+def obtener_devoluciones_por_rango(cursor, fecha_inicio, fecha_fin):
+    """
+    Obtiene todas las devoluciones en un rango de fechas.
+    """
+    query = """
+        SELECT 
+            d.id,
+            d.fecha_hora,
+            d.venta_id,
+            u.nombre_usuario,
+            d.total_devolucion,
+            d.tipo_devolucion,
+            d.motivo
+        FROM devoluciones d
+        JOIN usuarios u ON d.usuario_id = u.id
+        WHERE DATE(d.fecha_hora) BETWEEN ? AND ?
+        ORDER BY d.fecha_hora DESC
+    """
+    cursor.execute(query, (fecha_inicio, fecha_fin))
+    return cursor.fetchall()
+
+
+@db_connection
+def obtener_detalle_devolucion(cursor, devolucion_id):
+    """
+    Obtiene el detalle completo de una devolución.
+    """
+    # Info general
+    cursor.execute("""
+        SELECT 
+            d.id,
+            d.venta_id,
+            d.fecha_hora,
+            u.nombre_usuario,
+            d.total_devolucion,
+            d.tipo_devolucion,
+            d.motivo
+        FROM devoluciones d
+        JOIN usuarios u ON d.usuario_id = u.id
+        WHERE d.id = ?
+    """, (devolucion_id,))
+    
+    info_devolucion = cursor.fetchone()
+    if not info_devolucion:
+        return None, None
+    
+    # Productos devueltos
+    cursor.execute("""
+        SELECT 
+            p.nombre,
+            dd.cantidad_devuelta,
+            dd.precio_unitario,
+            (dd.cantidad_devuelta * dd.precio_unitario) as subtotal
+        FROM detalles_devolucion dd
+        JOIN productos p ON dd.producto_id = p.id
+        WHERE dd.devolucion_id = ?
+    """, (devolucion_id,))
+    
+    detalles = cursor.fetchall()
+    
+    return info_devolucion, detalles
+
+
+@db_connection
+def obtener_estadisticas_devoluciones(cursor, fecha_inicio, fecha_fin):
+    """
+    Obtiene estadísticas de devoluciones en un período.
+    """
+    query = """
+        SELECT 
+            COUNT(*) as total_devoluciones,
+            SUM(total_devolucion) as monto_total_devuelto,
+            SUM(CASE WHEN tipo_devolucion = 'COMPLETA' THEN 1 ELSE 0 END) as completas,
+            SUM(CASE WHEN tipo_devolucion = 'PARCIAL' THEN 1 ELSE 0 END) as parciales,
+            AVG(total_devolucion) as promedio_devolucion
+        FROM devoluciones
+        WHERE DATE(fecha_hora) BETWEEN ? AND ?
+    """
+    cursor.execute(query, (fecha_inicio, fecha_fin))
+    resultado = cursor.fetchone()
+    
+    if not resultado or resultado[0] == 0:
+        return {
+            "total_devoluciones": 0,
+            "monto_total_devuelto": 0.0,
+            "completas": 0,
+            "parciales": 0,
+            "promedio_devolucion": 0.0
+        }
+    
+    return {
+        "total_devoluciones": resultado[0],
+        "monto_total_devuelto": resultado[1] or 0.0,
+        "completas": resultado[2] or 0,
+        "parciales": resultado[3] or 0,
+        "promedio_devolucion": resultado[4] or 0.0
     }
