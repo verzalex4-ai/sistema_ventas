@@ -206,37 +206,6 @@ def setup_database():
             );
         """)
         
-                # --- TABLA DEVOLUCIONES ---
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS devoluciones (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                venta_id INTEGER NOT NULL,
-                usuario_id INTEGER NOT NULL,
-                fecha_hora TEXT NOT NULL,
-                total_devolucion REAL NOT NULL CHECK(total_devolucion >= 0),
-                tipo_devolucion TEXT NOT NULL CHECK(tipo_devolucion IN ('COMPLETA', 'PARCIAL')),
-                motivo TEXT,
-                FOREIGN KEY (venta_id) REFERENCES ventas (id),
-                FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
-            );
-        ''')
-
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS detalles_devolucion (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                devolucion_id INTEGER NOT NULL,
-                producto_id INTEGER NOT NULL,
-                cantidad_devuelta INTEGER NOT NULL CHECK(cantidad_devuelta > 0),
-                precio_unitario REAL NOT NULL CHECK(precio_unitario >= 0),
-                FOREIGN KEY (devolucion_id) REFERENCES devoluciones (id) ON DELETE CASCADE,
-                FOREIGN KEY (producto_id) REFERENCES productos (id)
-            );
-        ''')
-
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_devoluciones_venta ON devoluciones(venta_id);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_devoluciones_fecha ON devoluciones(fecha_hora);")
-
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_cierres_fecha ON cierres_caja(fecha_hora);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_cierres_usuario ON cierres_caja(usuario_id);")
 
         # --- CREAR ÍNDICES PARA OPTIMIZAR BÚSQUEDAS ---

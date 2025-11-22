@@ -186,19 +186,6 @@ class MainWindow:
 
         self.abrir_punto_venta()  # Inicia en la vista POS
 
-        # Dentro del bloque "if self.rol == 'admin':"
-        ttk.Button(
-            self.sidebar_frame,
-            text="Devoluciones",
-            command=lambda: self.verificar_y_cambiar_seccion(
-                self._abrir_devoluciones_interno
-            ),
-        ).pack(fill=X, padx=10, pady=5)
-
-    def _abrir_devoluciones_interno(self):
-        from devolucion_view import DevolucionView
-        DevolucionView(self.content_frame, self.usuario_id)
-
     def limpiar_content_frame(self):
         for widget in self.content_frame.winfo_children():
             widget.destroy()
