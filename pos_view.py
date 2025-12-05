@@ -189,7 +189,7 @@ class POSView:
         total = float(total_str)
 
         # 1. El diálogo de pago ya es modal gracias a BaseDialog/wait_window
-        dialogo_pago = PaymentDialog(self.parent_frame, f"${total:.2f}")
+        dialogo_pago = PaymentDialog(self.parent_frame, f"${total:.2f}", self.usuario_id)  # ✅ AGREGADO usuario_id
         self.parent_frame.wait_window(dialogo_pago)
 
         resultado = dialogo_pago.resultado
@@ -472,9 +472,10 @@ class POSView:
 
 # (La clase PaymentDialog no sufre cambios en este paso)
 class PaymentDialog(BaseDialog):
-    def __init__(self, parent, total_str):
+    def __init__(self, parent, total_str, usuario_id):
         super().__init__(parent, title="Finalizar Venta")
         self.resultado = None
+        self.usuario_id = usuario_id 
 
         main_frame = ttk.Frame(self, padding=20)
         main_frame.pack(expand=True, fill=BOTH)
@@ -543,7 +544,7 @@ class PaymentDialog(BaseDialog):
         self.center_window()
 
     def crear_nuevo_deudor(self):
-        form_deudor = DebtorForm(self, None, self.refrescar_y_seleccionar_deudor)
+        form_deudor = DebtorForm(self, None, self.refrescar_y_seleccionar_deudor, self.usuario_id)  # ✅ AGREGADO usuario_id
         self.wait_window(form_deudor)
 
     def refrescar_y_seleccionar_deudor(self, nombre_nuevo_deudor=None):

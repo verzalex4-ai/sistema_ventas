@@ -1,7 +1,9 @@
-# main.py - FASE 1: LOGIN CON CAMBIO DE CONTRASEÑA OBLIGATORIO
+# main.py - FASE 1: LOGIN CON LOGO Y CAMBIO DE CONTRASEÑA OBLIGATORIO
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from tkinter import messagebox
+from PIL import Image, ImageTk
+import os
 from database import setup_database, verificar_credenciales, actualizar_contrasena
 from main_window import MainWindow
 
@@ -112,8 +114,31 @@ class App:
     def __init__(self, root):
         self.root = root
         self.root.title("Sistema de Ventas - Login")
-        self.frame = ttk.Frame(self.root, padding=(20, 20))
-        self.frame.pack(expand=True, fill=BOTH)
+        
+        # Frame principal
+        self.main_container = ttk.Frame(self.root, padding=(20, 20))
+        self.main_container.pack(expand=True, fill=BOTH)
+        
+        # ============================================
+        # LADO IZQUIERDO - LOGO
+        # ============================================
+        left_frame = ttk.Frame(self.main_container)
+        left_frame.pack(side=LEFT, fill=BOTH, expand=True, padx=(0, 20))
+        
+        # Intentar cargar el logo
+        self.logo_label = ttk.Label(left_frame)
+        self.logo_label.pack(expand=True)
+        self.cargar_logo()
+        
+        # ============================================
+        # LADO DERECHO - FORMULARIO DE LOGIN
+        # ============================================
+        right_frame = ttk.Frame(self.main_container)
+        right_frame.pack(side=RIGHT, fill=BOTH, expand=True)
+        
+        # Contenedor del formulario
+        self.frame = ttk.Frame(right_frame, padding=(20, 20))
+        self.frame.pack(expand=True)
         
         ttk.Label(
             self.frame, 
@@ -140,6 +165,48 @@ class App:
         
         self.root.bind("<Return>", lambda event=None: self.btn_login.invoke())
         self.root.eval("tk::PlaceWindow . center")
+
+    def cargar_logo(self):
+        """Intenta cargar el logo desde varios posibles ubicaciones."""
+        posibles_rutas = [
+            "logo.png",                    # En la carpeta raíz del proyecto
+            os.path.join("assets", "logo.png"),  # En una carpeta 'assets'
+            os.path.join("images", "logo.png"),  # En una carpeta 'images'
+        ]
+        
+        logo_cargado = False
+        
+        for ruta in posibles_rutas:
+            if os.path.exists(ruta):
+                try:
+                    # Cargar y redimensionar la imagen
+                    imagen = Image.open(ruta)
+                    
+                    # Redimensionar manteniendo la proporción (máximo 300x300)
+                    imagen.thumbnail((300, 300), Image.Resampling.LANCZOS)
+                    
+                    # Convertir para tkinter
+                    self.logo_image = ImageTk.PhotoImage(imagen)
+                    self.logo_label.config(image=self.logo_image)
+                    
+                    logo_cargado = True
+                    print(f"✅ Logo cargado desde: {ruta}")
+                    break
+                    
+                except Exception as e:
+                    print(f"❌ Error al cargar logo desde {ruta}: {e}")
+        
+        if not logo_cargado:
+            # Si no se encuentra el logo, mostrar un texto alternativo
+            self.logo_label.config(
+                text="🏪\nSISTEMA POS\nVentas",
+                font=("Helvetica", 32, "bold"),
+                bootstyle="primary"
+            )
+            print("ℹ️ No se encontró logo.png - Se muestra texto alternativo")
+            print(f"   Busca el logo en las siguientes rutas:")
+            for ruta in posibles_rutas:
+                print(f"   - {os.path.abspath(ruta)}")
 
     def intentar_login(self):
         usuario = self.entry_usuario.get()
