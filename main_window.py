@@ -31,7 +31,7 @@ class MainWindow:
         self.root.withdraw()
 
         self.main_win = ttk.Toplevel(self.root)
-        self.main_win.title("Panel Principal del Sistema")
+        self.main_win.title("ClickVenta")
         self.main_win.geometry("1024x600")
 
         self.main_win.update_idletasks()

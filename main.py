@@ -113,7 +113,7 @@ class PasswordChangeDialog(ttk.Toplevel):
 class App:
     def __init__(self, root):
         self.root = root
-        self.root.title("Sistema de Ventas - Login")
+        self.root.title("ClickVenta")
         
         # Frame principal
         self.main_container = ttk.Frame(self.root, padding=(20, 20))
